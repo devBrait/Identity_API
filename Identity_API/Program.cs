@@ -1,25 +1,44 @@
+using Identity_API.Data;
+using Identity_API.Models;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
+
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-
-builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+builder.Services
+    .AddDbContext<AppDbContext>(
+    options => options.UseSqlServer("Server=(localdb)\\mssqllocaldb;Database=identity-db;Trusted_Connection=True;MultipleActiveResultSets=true")
+    );
+
+builder.Services.AddAuthentication();
+builder.Services.AddAuthorization();
+
+builder.Services
+    .AddIdentityApiEndpoints<User>()
+    .AddEntityFrameworkStores<AppDbContext>();
+
+
 var app = builder.Build();
 
-// Configure the HTTP request pipeline.
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+app.UseSwagger();
+app.UseSwaggerUI();
+app.MapSwagger();
 
-app.UseHttpsRedirection();
+app.MapGet("/", (ClaimsPrincipal user) => user.Identity!.Name)
+    .RequireAuthorization();
 
-app.UseAuthorization();
+app.MapIdentityApi<User>();
 
-app.MapControllers();
+app.MapPost("/logout", 
+    async(SignInManager < User > signInManager, [FromBody]object empty) =>
+    {
+        await signInManager.SignOutAsync();
+        return Results.Ok();
+    });
 
 app.Run();
